@@ -52,7 +52,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       // to be brought where the card was for the user to reach it.
       DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
         guard let self, element.role != nil else { return }
-        self.watcher.reveal(element, in: card)
+        if self.watcher.reveal(element, in: card) { self.cards.setSuspended(true) }
       }
     },
     showImage: { [weak self] notice in
@@ -61,7 +61,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       guard let self, let element = notice.element else { return }
       let card = self.cards.cardFrame(forKey: notice.key).map(Self.axRect(of:))
       logI("show the original for its picture: \(notice.app)")
-      self.watcher.reveal(element, in: card)
+      if self.watcher.reveal(element, in: card) { self.cards.setSuspended(true) }
     },
     close: { group in
       // Closing our card closes every system notification in the group, so alerts do not linger.
@@ -127,6 +127,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     watcher.onNotice = { [weak self] notice in self?.present(notice, via: "ax") }
     watcher.onGone = { [weak self] key in self?.cards.remove(key: key) }
     watcher.onLostTrust = { [weak self] in self?.ensureTrustedThenStart() }
+    watcher.onRevealEnded = { [weak self] in self?.cards.setSuspended(false) }
     startUpdateChecks()
     registerActionCategory()
     let dnc = DistributedNotificationCenter.default()

@@ -1809,6 +1809,19 @@ final class CardManager {
     for c in cards { c.dismiss() }
   }
 
+  /// While the system's own banner stands where a card was (a code, a reply field), the cards already
+  /// up step aside — the next one would otherwise slide into that spot and cover it. A notification
+  /// that arrives meanwhile still shows; it is news.
+  private var isSuspended = false
+  func setSuspended(_ on: Bool) {
+    guard on != isSuspended else { return }
+    isSuspended = on
+    for c in cards where !c.isClosing {
+      if on { c.orderOut(nil) } else { c.orderFrontRegardless() }
+    }
+    if !on { layout() }
+  }
+
   /// The system banner for this notice is gone. A card lives exactly as long as the system
   /// banner of its newest notice; older notices were already replaced by newer ones from the
   /// same app and stay on the card as context, so their going away changes nothing.

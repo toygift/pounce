@@ -83,6 +83,8 @@ final class Watcher {
   var onGone: ((String) -> Void)?
   /// Accessibility permission disappeared while running.
   var onLostTrust: (() -> Void)?
+  /// The banner brought into view by `reveal` is gone, and its window is parked again.
+  var onRevealEnded: (() -> Void)?
 
   /// While paused (screen locked) nothing is hidden or reported; the system keeps its banners.
   var isPaused = false {
@@ -103,6 +105,10 @@ final class Watcher {
   private var emptySince = [AXUIElement: Date]()
   /// Where a revealed window is being held instead of off-screen: the spot its card was using.
   private var holdTargets = [AXUIElement: CGPoint]()
+  /// The banner `reveal` brought into view. Its window holds the other banners too — persistent
+  /// alerts that never leave on their own — so the window cannot wait to be empty before it is
+  /// parked again; it goes back the moment this one banner is gone.
+  private var revealedKey: String?
   private var loggedSkips = Set<AXUIElement>()
   private var unreadableWindows = Set<AXUIElement>()
   private var seenKeys = [String: Date]()
@@ -179,6 +185,10 @@ final class Watcher {
     emptySince.removeAll()
     holdTargets.removeAll()
     releasedWindows.removeAll()
+    if revealedKey != nil {
+      revealedKey = nil
+      onRevealEnded?()
+    }
     seenKeys.removeAll()
     liveKeys.removeAll()
     liveBanners.removeAll()
@@ -223,7 +233,10 @@ final class Watcher {
   /// coordinates). Pressing a banner button can open something the system draws inside its own
   /// banner — a reply field, a menu — and the only way to use that is to look at the real thing,
   /// so it comes to where the card was standing, wherever that was.
-  func reveal(_ banner: AXUIElement, in card: CGRect?) {
+  /// Returns whether the banner can be followed to its end, which is when `onRevealEnded` comes.
+  @discardableResult
+  func reveal(_ banner: AXUIElement, in card: CGRect?) -> Bool {
+    revealedKey = bannerKeys[banner]
     for w in Array(parkedOrigins.keys) {
       releasedWindows.insert(w)
       emptySince.removeValue(forKey: w)
@@ -243,6 +256,18 @@ final class Watcher {
       let r = w.setPosition(origin)
       logI("reveal banner \(NSStringFromRect(wanted)) on card \(NSStringFromRect(card)) result=\(r.name)")
     }
+    return revealedKey != nil
+  }
+
+  /// The revealed banner is finished. Every window let out for it is parked again — the hold timer
+  /// pushes the ones still parked back off-screen, and the next scan parks any that were restored.
+  /// No scan from here: this runs inside one, from `fireGone`.
+  private func endReveal() {
+    revealedKey = nil
+    for w in releasedWindows { holdTargets.removeValue(forKey: w) }
+    releasedWindows.removeAll()
+    logI("revealed banner gone; parking again")
+    onRevealEnded?()
   }
 
   /// Pushes a rectangle back inside the display it sits on, leaving a small margin.
@@ -482,6 +507,7 @@ final class Watcher {
     logD("gone \(key.prefix(8)) reason=\(reason)")
     forget(key)
     onGone?(key)
+    if key == revealedKey { endReveal() }
   }
 
   private func forget(_ key: String) {
