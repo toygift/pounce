@@ -243,7 +243,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func setupStatusItem() {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-    item.button?.image = Self.menuBarPaw()
+    item.button?.image = Self.menuBarGlyph()
     item.menu = statusMenu()
     item.isVisible = !Settings.shared.menuBarHidden
     statusItem = item
@@ -458,15 +458,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
   }
 
-  /// The same paw as the app icon, as a template so the menu bar tints it for light, dark and accents.
-  private static func menuBarPaw() -> NSImage? {
-    guard let path = Bundle.main.path(forResource: "paw", ofType: "png"), let paw = NSImage(contentsOfFile: path) else {
-      return NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "Pounce")
+  /// The same glyph as the app icon, as a template so the menu bar tints it for light, dark and accents.
+  private static func menuBarGlyph() -> NSImage? {
+    guard let path = Bundle.main.path(forResource: "glyph", ofType: "png"), let glyph = NSImage(contentsOfFile: path) else {
+      return NSImage(systemSymbolName: "bell.badge", accessibilityDescription: "Pounce")
     }
-    paw.isTemplate = true
-    paw.size = NSSize(width: 18, height: 18)
-    paw.accessibilityDescription = "Pounce"
-    return paw
+    glyph.isTemplate = true
+    glyph.size = NSSize(width: 18, height: 18)
+    glyph.accessibilityDescription = "Pounce"
+    return glyph
   }
 
   @objc private func openSettings() { showSettings() }

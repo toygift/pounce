@@ -2,10 +2,15 @@ APP      := Pounce
 BUNDLE   := $(APP).app
 # The signing identity of one team, on every Mac and for every build: releases and local installs
 # must look like the same app to macOS, or the granted permissions fall away and the app refuses to
-# update itself. signing-identity.sh picks by the certificate's team, falling back to ad-hoc.
-# Override with `make install IDENTITY=<hash>` or `RELEASE_TEAM=<team> make install`.
+# update itself. signing-identity.sh picks by the certificate's team. A Mac without the team's
+# certificate falls back to a self-signed "Pounce Local" in the login keychain if there is one —
+# local builds only, but every rebuild keeps the same identity, so Accessibility stays granted —
+# and to ad-hoc otherwise. Override with `make install IDENTITY=<hash>` or `RELEASE_TEAM=<team> make install`.
 RELEASE_TEAM ?= VXR4D4G8N4
-IDENTITY ?= $(shell ./signing-identity.sh $(RELEASE_TEAM))
+LOCAL_CERT ?= Pounce Local
+IDENTITY ?= $(shell h=$$(./signing-identity.sh $(RELEASE_TEAM)); \
+  [ "$$h" = "-" ] && h=$$(security find-certificate -c "$(LOCAL_CERT)" -Z 2>/dev/null | sed -n 's/^SHA-1 hash: //p' | head -1); \
+  printf '%s' "$${h:--}")
 SRC      := $(wildcard src/*.swift)
 
 all: build
@@ -14,7 +19,7 @@ build:
 	@mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources
 	@cp src/Info.plist $(BUNDLE)/Contents/
 	@cp src/assets/Pounce.icns $(BUNDLE)/Contents/Resources/
-	@cp src/assets/paw-mask.png $(BUNDLE)/Contents/Resources/paw.png
+	@cp src/assets/glyph-mask.png $(BUNDLE)/Contents/Resources/glyph.png
 	@cp src/assets/tungsten.jpg $(BUNDLE)/Contents/Resources/
 	swiftc $(SRC) -o $(BUNDLE)/Contents/MacOS/$(APP) -O -parse-as-library -target arm64-apple-macos14.0
 	codesign -fs "$(IDENTITY)" $(BUNDLE)
@@ -32,8 +37,9 @@ run: install
 clean:
 	@rm -rf $(BUNDLE)
 
-# Regenerates the app icon and the menu bar paw from src/assets/paw-source.png.
+# Regenerates the app icon and the menu bar glyph, drawn by src/assets/make-glyph.swift.
 icon:
+	swift src/assets/make-glyph.swift
 	swift src/assets/make-icon.swift $(DIST)/Pounce.iconset
 	iconutil -c icns $(DIST)/Pounce.iconset -o src/assets/Pounce.icns
 	@rm -rf $(DIST)/Pounce.iconset
@@ -54,7 +60,7 @@ dist:
 	@rm -rf $(BUNDLE) $(DIST) && mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources $(DIST)
 	@cp src/Info.plist $(BUNDLE)/Contents/
 	@cp src/assets/Pounce.icns $(BUNDLE)/Contents/Resources/
-	@cp src/assets/paw-mask.png $(BUNDLE)/Contents/Resources/paw.png
+	@cp src/assets/glyph-mask.png $(BUNDLE)/Contents/Resources/glyph.png
 	@cp src/assets/tungsten.jpg $(BUNDLE)/Contents/Resources/
 	swiftc $(SRC) -o $(DIST)/$(APP)-arm64  -O -parse-as-library -target arm64-apple-macos14.0
 	swiftc $(SRC) -o $(DIST)/$(APP)-x86_64 -O -parse-as-library -target x86_64-apple-macos14.0
@@ -71,7 +77,7 @@ package:
 	@rm -rf $(BUNDLE) $(DIST) && mkdir -p $(BUNDLE)/Contents/MacOS $(BUNDLE)/Contents/Resources $(DIST)
 	@cp src/Info.plist $(BUNDLE)/Contents/
 	@cp src/assets/Pounce.icns $(BUNDLE)/Contents/Resources/
-	@cp src/assets/paw-mask.png $(BUNDLE)/Contents/Resources/paw.png
+	@cp src/assets/glyph-mask.png $(BUNDLE)/Contents/Resources/glyph.png
 	@cp src/assets/tungsten.jpg $(BUNDLE)/Contents/Resources/
 	swiftc $(SRC) -o $(DIST)/$(APP)-arm64  -O -parse-as-library -target arm64-apple-macos14.0
 	swiftc $(SRC) -o $(DIST)/$(APP)-x86_64 -O -parse-as-library -target x86_64-apple-macos14.0
