@@ -341,6 +341,14 @@ final class Watcher {
       case .skip(let why):
         unreadableWindows.remove(w)
         if loggedSkips.insert(w).inserted { logD("skip window: \(why)") }
+        // The clock-click panel draws in the same window as the banners. Persistent alerts keep that
+        // window parked for good, so left alone the panel would open 5000 points above the screen.
+        // It comes back here; the banners are parked again once the panel closes and they are alone.
+        if parkedOrigins[w] != nil {
+          emptySince.removeValue(forKey: w)
+          logI("releasing parked window: \(why)")
+          restore(w, reason: why)
+        }
       case .unreadable(let why):
         // A tree we could not read tells us nothing. The window stays where it is — parked windows
         // parked, cards standing — until a read comes back that we can believe.
@@ -669,6 +677,10 @@ final class Watcher {
     let desc = cleanAX(banner.desc ?? banner.attributedDescription ?? "")
     var app = cleanAX(desc.components(separatedBy: ", ").first ?? desc)
     if !title.isEmpty, app.hasSuffix(title) { app = cleanAX(String(app.dropLast(title.count))) }
+    // System alerts (Apple Account sign-in, for one) name no app either, and the title runs straight
+    // into the body: "로그인된 Apple 계정 고객님의 Apple 계정이 …". A first part that opens with the
+    // title has no app name in front of it.
+    else if !title.isEmpty, app.hasPrefix(title) { app = "" }
     // Some senders carry no app name in the description (phone notifications without a title, for one):
     // the first part is just the title. Then that is the name to show, and the title line stays empty.
     // A banner being taken apart still answers with its description after its text has gone. What
